@@ -1,0 +1,158 @@
+# Script de Administración de Sistema
+
+## Descripción General
+
+Este script de Bash está diseñado para ayudar en tareas de administración del sistema Linux. Proporciona un menú interactivo con opciones para:
+- Crear un nuevo usuario en el sistema.
+- Verificar e instalar actualizaciones del sistema.
+- Generar un informe del sistema que incluye el uso de CPU, memoria y espacio en disco.
+
+## Requisitos Previos
+
+- **Permisos de Superusuario**: Para la creación de usuarios y actualizaciones, se requieren permisos de superusuario.
+- **Entorno Compatible**: El script está pensado para sistemas operativos basados en Debian, como Ubuntu, ya que utiliza el gestor de paquetes `apt`.
+
+## Explicación de Funcionalidades
+
+### Variables de Color
+```bash
+VERDE='\033[0;32m'
+ROJO='\033[0;31m'
+NC='\033[0m'
+Estas variables permiten el uso de colores en los mensajes, donde VERDE es para éxito, ROJO para errores, y NC (sin color) restablece el color de texto.
+
+Función crear_usuario
+Descripción: Crea un nuevo usuario en el sistema si aún no existe.
+Pasos:
+Solicita el nombre del nuevo usuario.
+Verifica si el usuario ya existe con el comando id.
+Si el usuario no existe, lo crea y le asigna una contraseña.
+Crea un directorio /home para el usuario y ajusta los permisos de propiedad.
+bash
+Copiar código
+crear_usuario() {
+    clear
+    echo "=== Crear Usuario Nuevo ==="
+    echo
+    read -p "Ingrese nombre del nuevo usuario: " nombre_usuario
+    
+    if id "$nombre_usuario" >/dev/null 2>&1; then
+        echo -e "${ROJO}Error: El usuario ya existe${NC}"
+    else
+        sudo useradd -m -s /bin/bash "$nombre_usuario"
+        
+        echo -e "${VERDE}Establezca una contraseña para $nombre_usuario${NC}"
+        sudo passwd "$nombre_usuario"
+        
+        if [ ! -d "/home/$nombre_usuario" ]; then
+            sudo mkdir -p "/home/$nombre_usuario"
+            sudo chown "$nombre_usuario:$nombre_usuario" "/home/$nombre_usuario"
+        fi
+        
+        echo -e "${VERDE}Usuario creado exitosamente${NC}"
+    fi
+}
+Función verificar_actualizaciones
+Descripción: Comprueba si hay actualizaciones del sistema y, si el usuario lo elige, las instala.
+Pasos:
+Ejecuta apt update para obtener información de actualizaciones.
+Lista los paquetes actualizables.
+Si el usuario elige, procede con la actualización usando apt upgrade -y.
+bash
+Copiar código
+verificar_actualizaciones() {
+    clear
+    echo "=== Verificar Actualizaciones ==="
+    echo
+    if sudo apt update; then
+        echo
+        apt list --upgradable
+        
+        echo
+        read -p "¿Desea instalar las actualizaciones? (s/n): " respuesta
+        if [ "$respuesta" = "s" ]; then
+            if sudo apt upgrade -y; then
+                echo -e "${VERDE}Actualizaciones instaladas${NC}"
+            else
+                echo -e "${ROJO}Error: No se pudieron instalar las actualizaciones${NC}"
+            fi
+        fi
+    else
+        echo -e "${ROJO}Error: Falló la actualización de los repositorios${NC}"
+    fi
+}
+Función ver_estado_sistema
+Descripción: Genera un informe del sistema que incluye información sobre CPU, RAM y espacio en disco.
+Pasos:
+Crea un archivo de log con la fecha actual.
+Captura el uso de CPU, memoria y espacio en disco.
+Guarda el informe en el archivo y lo muestra al usuario.
+bash
+Copiar código
+ver_estado_sistema() {
+    clear
+    echo "=== Informe del Sistema ==="
+    echo
+    log_file="informe_sistema_$(date +%Y%m%d_%H%M).txt"
+    
+    echo "Generando informe en $log_file ..."
+    
+    {
+        echo "=== INFORME DEL SISTEMA ==="
+        echo "Fecha: $(date)"
+        echo
+        echo "=== USO DE CPU ==="
+        top -bn1 | head -n 5
+        echo
+        echo "=== MEMORIA RAM ==="
+        free -h
+        echo
+        echo "=== ESPACIO EN DISCO ==="
+        df -h
+        
+    } > "$log_file"
+    
+    echo -e "${VERDE}Informe guardado en: $log_file${NC}"
+    echo
+    cat "$log_file"
+}
+Bucle Principal
+El bucle principal muestra un menú y captura la opción elegida por el usuario. Según la selección, se ejecuta la función correspondiente o se muestra un mensaje de error si la entrada es inválida.
+
+bash
+Copiar código
+while true; do
+    clear
+    echo "=============================="
+    echo "     MENÚ DE ADMINISTRACIÓN   "
+    echo "=============================="
+    echo "1. Crear usuario nuevo"
+    echo "2. Verificar actualizaciones"
+    echo "3. Generar informe del sistema"
+    echo "4. Salir"
+    echo
+    read -p "Elija una opción (1-4): " opcion
+    echo
+
+    case $opcion in
+        1)
+            crear_usuario
+            ;;
+        2)
+            verificar_actualizaciones
+            ;;
+        3)
+            ver_estado_sistema
+            ;;
+        4)
+            echo "¡Hasta luego!"
+            exit 0
+            ;;
+        *)
+            echo -e "${ROJO}Opción inválida${NC}"
+            ;;
+    esac
+
+    echo
+    read -p "Presione Enter para continuar..."
+done
